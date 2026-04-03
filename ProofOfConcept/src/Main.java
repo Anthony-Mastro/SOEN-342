@@ -1,13 +1,15 @@
-// to import tasks selection option 1 and then type in task1.csv
 import java.io.*;
 import java.util.*;
 
 public class Main {
 
-    // Database of tasks
+    // Database of tasks (in memory)
     static List<Task> tasks = new ArrayList<>();
 
     public static void main(String[] args) {
+
+        // ✅ Load tasks from disk at program start
+        loadTasks();
 
         Scanner scanner = new Scanner(System.in);
 
@@ -47,64 +49,39 @@ public class Main {
                     break;
 
                 case 5:
+                    // ✅ Save tasks to disk before exiting
+                    saveTasks();
                     System.out.println("Goodbye");
                     return;
             }
         }
     }
 
-    // Import CSV
+    // =======================
+    // CSV Import / Export (same as before)
+    // =======================
     public static void importCSV(String filePath) {
-
         try {
             BufferedReader br = new BufferedReader(new FileReader("ImportTasks/" + filePath));
             String line;
-
             while ((line = br.readLine()) != null) {
-
                 String[] values = line.split(",");
-// Extract all fields from the CSV array
-                String taskName            = values[0];
-                String description         = values[1];
-                String subtask             = values[2]; // optional
-                String status              = values[3];
-                String priority            = values[4];
-                String dueDate             = values[5];
-                String projectName         = values[6]; // optional
-                String projectDescription  = values[7]; // optional
-                String collaborator        = values[8]; // optional
-                String collaboratorCategory= values[9]; // optional
-
-// Create Task object using the new constructor
                 Task task = new Task(
-                        taskName,
-                        description,
-                        subtask,
-                        status,
-                        priority,
-                        dueDate,
-                        projectName,
-                        projectDescription,
-                        collaborator,
-                        collaboratorCategory
+                        values[0], values[1], values[2], values[3], values[4],
+                        values[5], values[6], values[7], values[8], values[9]
                 );
                 tasks.add(task);
             }
-
             br.close();
             System.out.println("Tasks imported successfully");
-
         } catch (IOException e) {
             System.out.println("Error reading file");
         }
     }
 
-    // Export CSV
     public static void exportCSV(String filePath) {
-
         try {
-            BufferedWriter bw = new BufferedWriter(new FileWriter("ExportTasks/"+ filePath));
-
+            BufferedWriter bw = new BufferedWriter(new FileWriter("ExportTasks/" + filePath));
             for (Task t : tasks) {
                 bw.write(
                         t.taskName + "," +
@@ -119,20 +96,18 @@ public class Main {
                                 t.collaboratorCategory
                 );
                 bw.newLine();
-
             }
-
             bw.close();
             System.out.println("Tasks exported successfully");
-
         } catch (IOException e) {
             System.out.println("Error writing file");
         }
     }
 
-    // Search Tasks
+    // =======================
+    // Search / View
+    // =======================
     public static void searchTasks(String keyword) {
-
         for (Task t : tasks) {
             if (t.taskName.contains(keyword) || t.description.contains(keyword)) {
                 System.out.println(t);
@@ -140,33 +115,58 @@ public class Main {
         }
     }
 
-    // View All Tasks
     public static void viewTasks() {
-
         if (tasks.isEmpty()) {
             System.out.println("No tasks available.");
             return;
         }
-
         for (Task t : tasks) {
             System.out.println(t);
         }
     }
+
+    // =======================
+    // Persistence methods
+    // =======================
+
+    public static void saveTasks() {
+        try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream("tasks.dat"))) {
+            out.writeObject(tasks);
+            System.out.println("Tasks saved to tasks.dat");
+        } catch (IOException e) {
+            System.out.println("Error saving tasks: " + e.getMessage());
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    public static void loadTasks() {
+        try (ObjectInputStream in = new ObjectInputStream(new FileInputStream("tasks.dat"))) {
+            tasks = (List<Task>) in.readObject();
+            System.out.println("Tasks loaded from tasks.dat");
+        } catch (FileNotFoundException e) {
+            System.out.println("No saved tasks found. Starting fresh.");
+        } catch (IOException | ClassNotFoundException e) {
+            System.out.println("Error loading tasks: " + e.getMessage());
+        }
+    }
 }
 
-// Task class
-class Task {
+// =======================
+// Task class (Serializable)
+// =======================
+class Task implements Serializable {
+    private static final long serialVersionUID = 1L;
 
     String taskName;
     String description;
-    String subtask;             // optional
+    String subtask;
     String status;
     String priority;
     String dueDate;
-    String projectName;         // optional
-    String projectDescription;  // optional
-    String collaborator;        // optional
-    String collaboratorCategory;// optional
+    String projectName;
+    String projectDescription;
+    String collaborator;
+    String collaboratorCategory;
 
     public Task(String taskName,
                 String description,
