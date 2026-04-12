@@ -1,4 +1,5 @@
 import java.io.*;
+import java.time.LocalDate;
 import java.util.*;
 
 public class Main {
@@ -19,6 +20,12 @@ public class Main {
             System.out.println("2. Search Tasks");
             System.out.println("3. View All Tasks");
             System.out.println("4. Export Tasks to CSV");
+            System.out.println("4. Update task");//project, tag sub and recurring
+            System.out.println("4. Create task");//sub and recurring
+            System.out.println("4. Assign self to task");//barely a proper feature??
+            System.out.println("4. Export to ical");
+            System.out.println("4. Edit collaborator loads");
+            System.out.println("4. View Task History");
             System.out.println("5. Exit");
 
             System.out.print("Choose option: ");
@@ -62,7 +69,7 @@ public class Main {
     // =======================
     public static void importCSV(String filePath) {
         try {
-            BufferedReader br = new BufferedReader(new FileReader("ImportTasks/" + filePath));
+            BufferedReader br = new BufferedReader(new FileReader("C:\\Users\\kevin\\IdeaProjects\\SOEN-342\\ProofOfConcept\\ImportTasks\\" + filePath));
             String line;
             while ((line = br.readLine()) != null) {
                 String[] values = line.split(",");
@@ -81,7 +88,7 @@ public class Main {
 
     public static void exportCSV(String filePath) {
         try {
-            BufferedWriter bw = new BufferedWriter(new FileWriter("ExportTasks/" + filePath));
+            BufferedWriter bw = new BufferedWriter(new FileWriter(filePath));
             for (Task t : tasks) {
                 bw.write(
                         t.taskName + "," +
@@ -159,7 +166,6 @@ class Task implements Serializable {
 
     String taskName;
     String description;
-    String subtask;
     String status;
     String priority;
     String dueDate;
@@ -167,21 +173,16 @@ class Task implements Serializable {
     String projectDescription;
     String collaborator;
     String collaboratorCategory;
+    boolean isRecurring = false;
+    String recurringType;
+    String recurringDescription;
+    List<String> tags = new ArrayList<>();
+    List<Subtask> subtasks=  new ArrayList<>();
+    List<History> history = new ArrayList<>();
 
-    public Task(String taskName,
-                String description,
-                String subtask,
-                String status,
-                String priority,
-                String dueDate,
-                String projectName,
-                String projectDescription,
-                String collaborator,
-                String collaboratorCategory) {
-
+    public Task(String taskName, String description, String status, String priority, String dueDate, String projectName, String projectDescription, String collaborator, String collaboratorCategory, boolean isRecurring, String recurringType, String recurringDescription, List<String> tags, List<Subtask> subtasks, List<History> history) {
         this.taskName = taskName;
         this.description = description;
-        this.subtask = subtask;
         this.status = status;
         this.priority = priority;
         this.dueDate = dueDate;
@@ -189,19 +190,117 @@ class Task implements Serializable {
         this.projectDescription = projectDescription;
         this.collaborator = collaborator;
         this.collaboratorCategory = collaboratorCategory;
+        this.isRecurring = isRecurring;
+        this.recurringType = recurringType;
+        this.recurringDescription = recurringDescription;
+        this.tags = tags;
+        this.subtasks = subtasks;
+        this.history = history;
     }
+
 
     @Override
     public String toString() {
         return "TaskName: " + taskName +
                 " | Description: " + description +
-                " | Subtask: " + subtask +
                 " | Status: " + status +
                 " | Priority: " + priority +
                 " | DueDate: " + dueDate +
                 " | ProjectName: " + projectName +
                 " | ProjectDescription: " + projectDescription +
                 " | Collaborator: " + collaborator +
-                " | CollaboratorCategory: " + collaboratorCategory;
+                " | CollaboratorCategory: " + collaboratorCategory+
+                " | isRecurring: " + isRecurring +
+                ;
+    }
+
+    public void setTaskName(String taskName) {
+        this.taskName = taskName;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public void setPriority(String priority) {
+        this.priority = priority;
+    }
+
+    public void setDueDate(String dueDate) {
+        this.dueDate = dueDate;
+    }
+
+    public void setProjectName(String projectName) {
+        this.projectName = projectName;
+    }
+
+    public void setProjectDescription(String projectDescription) {
+        this.projectDescription = projectDescription;
+    }
+
+    public void setCollaborator(String collaborator) {
+        this.collaborator = collaborator;
+    }
+
+    public void setCollaboratorCategory(String collaboratorCategory) {
+        this.collaboratorCategory = collaboratorCategory;
+    }
+
+    public void setRecurring(boolean recurring) {
+        isRecurring = recurring;
+    }
+
+    public void setRecurringType(String recurringType) {
+        this.recurringType = recurringType;
+    }
+
+    public void setRecurringDescription(String recurringDescription) {
+        this.recurringDescription = recurringDescription;
+    }
+}
+
+// =======================
+// History class
+// =======================
+class History{
+    LocalDate timestamp;
+    String description;
+
+    @Override
+    public String toString() {
+        return "Timestamp: "+this.timestamp+" | Description:"+this.description;
+    }
+}
+
+class Subtask extends Task {
+    Collaborator collaborator;
+
+    public Subtask(String taskName, String description, String status, String priority, String dueDate, String projectName, String projectDescription, String collaborator, String collaboratorCategory, boolean isRecurring, String recurringType, String recurringDescription, List<String> tags, List<Subtask> subtasks, List<History> history) {
+        super(taskName, description, status, priority, dueDate, projectName, projectDescription, collaborator, collaboratorCategory, isRecurring, recurringType, recurringDescription, tags, subtasks, history);
+    }
+
+    public void setCollaborator(Collaborator collaborator) {
+        this.collaborator = collaborator;
+    }
+
+    @Override
+    public String toString() {
+        return "Subtask{" +
+                "collaborator=" + collaborator +
+                ", taskName='" + taskName + '\'' +
+                ", status='" + status + '\'' +
+                '}';
+    }
+}
+
+class Collaborator{
+
+    @Override
+    public String toString() {
+        return "Collaborator{}";
     }
 }
