@@ -22,7 +22,6 @@ public class Main {
         String attribute;
         String value;
         while (true) {
-            //todo fix menu
             System.out.println("\n1. Import Tasks from CSV");
             System.out.println("2. Search Tasks");
             System.out.println("3. View All Tasks");
@@ -106,8 +105,9 @@ public class Main {
             while ((line = br.readLine()) != null) {
                 String[] values = line.split(",");
                 Task task = new Task(
-                        values[0], values[1], values[2], values[3], values[4],
-                        values[5], values[6], (boolean)values[7], values[8], values[9]
+                        values[0], values[1], values[2], values[3], LocalDate.parse(values[4]),
+                        values[5], values[6], Boolean.parseBoolean(values[7]), values[8], values[9],
+                        values[10],values[11], values[12]
                 );
                 tasks.add(task);
             }
@@ -117,7 +117,8 @@ public class Main {
             System.out.println("Error reading file");
         }
     }
-    //Todo fix with changes in task
+
+    //Todo fix with project
     public static void exportCSV(String filePath) {
         try {
             BufferedWriter bw = new BufferedWriter(new FileWriter(filePath));
@@ -130,6 +131,11 @@ public class Main {
                                 t.dueDate + "," +
                                 t.projectName + "," +
                                 t.projectDescription + "," +
+                                t.isRecurring+","+
+                                t.recurringType+","+
+                                t.recurringDescription+","+
+                                t.tags+","+
+                                t.subtasks+","
                 );
                 bw.newLine();
             }
@@ -143,9 +149,10 @@ public class Main {
     // =======================
     // Search / View/
     // =======================
+    //todo Add project
     public static void searchTasks(String keyword) {
         for (Task t : tasks) {
-            if (t.taskName.contains(keyword) || t.description.contains(keyword)) {
+            if (t.taskName.contains(keyword) || t.description.contains(keyword)||t.projectName.contains(keyword) || t.projectDescription.contains(keyword)||t.status.contains(keyword)||t.tags.contains(keyword)) {
                 System.out.println(t);
             }
         }
@@ -160,8 +167,10 @@ public class Main {
             System.out.println(t);
         }
     }
-
-    //todo make things optionsl
+    //todo Ocl constrant
+    //todo recurrence guards
+    //todo project implement
+    //handles both normal creation and subtask
     public static void createTask() {
         Scanner sc = new Scanner(System.in);
         boolean flag = true;
@@ -256,6 +265,8 @@ public class Main {
 
         }
     }
+
+    //updates one attribute at a time
     public static void updateTask(Task task, String Attribute,String value){
         switch (Attribute){
             case "title":
@@ -313,6 +324,8 @@ public class Main {
             System.out.print(tasks.get(index).getHistory());
         }
     }
+
+    //guard that runs on startup to preform recurrence
     public static void checkRecurringTasks(){
         LocalDate today=LocalDate.now();
         for (Task t : tasks) {
@@ -424,6 +437,12 @@ public class Main {
         } catch (IOException e) {
             System.out.println("Error saving tasks: " + e.getMessage());
         }
+        try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream("subtasks.dat"))) {
+            out.writeObject(tasks);
+            System.out.println("Tasks saved to subtasks.dat");
+        } catch (IOException e) {
+            System.out.println("Error saving tasks: " + e.getMessage());
+        }
     }
     @SuppressWarnings("unchecked")
     public static void loadTasks() {
@@ -432,6 +451,14 @@ public class Main {
             System.out.println("Tasks loaded from tasks.dat");
         } catch (FileNotFoundException e) {
             System.out.println("No saved tasks found. Starting fresh.");
+        } catch (IOException | ClassNotFoundException e) {
+            System.out.println("Error loading tasks: " + e.getMessage());
+        }
+        try (ObjectInputStream in = new ObjectInputStream(new FileInputStream("subtasks.dat"))) {
+            tasks = (List<Task>) in.readObject();
+            System.out.println("Tasks loaded from subtasks.dat");
+        } catch (FileNotFoundException e) {
+            System.out.println("No saved subtasks found. Starting fresh. May have errors");
         } catch (IOException | ClassNotFoundException e) {
             System.out.println("Error loading tasks: " + e.getMessage());
         }
@@ -476,18 +503,33 @@ class Task implements Serializable {
     }
 
     //TODO:Proper Project implementation here
-    //TODO:fix to string
     @Override
     public String toString() {
+        String progress;
+        if (subtasks.isEmpty()){
+            progress="";
+        }else{
+            int complete=0;
+            for (Subtask subtask : subtasks){
+                if (subtask.status.equals("complete")){
+                    complete++;
+                }
+            }
+            progress = " | completion ("+complete+"/"+subtasks.size()+")";
+        }
         return "TaskName: " + taskName +
                 " | Description: " + description +
+                " | creation date: " + history.getFirst().timestamp +
                 " | Status: " + status +
                 " | Priority: " + priority +
                 " | DueDate: " + dueDate +
                 " | ProjectName: " + projectName +
                 " | ProjectDescription: " + projectDescription +
-                " | isRecurring: " + isRecurring
-                ;
+                " | isRecurring: " + isRecurring +
+                " | recurringType: " + recurringType+
+                " | recurringDescription: " + recurringDescription +
+                " | tags: " + tags
+                + " | subtasks: " + subtasks+progress;
     }
 
     public void setTaskName(String taskName) {
@@ -535,6 +577,7 @@ class Task implements Serializable {
     }
 
     //TODO:Proper Project implementation here
+    //creates a subtask that is open and with recurrence values empty or false
     public void createSubtask(String title){
         this.subtasks.add(new Subtask(title,this.description,"Open", this.priority,this.dueDate,this.projectName,this.projectDescription,false,"","",this.tags,null,new ArrayList<>()));
     }
