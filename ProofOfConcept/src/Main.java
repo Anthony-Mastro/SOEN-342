@@ -89,6 +89,7 @@ public class Main {
                     // ✅ Save tasks to disk before exiting
                     saveTasks();
                     System.out.println("Goodbye");
+                    scanner.close();
                     return;
             }
         }
@@ -98,6 +99,8 @@ public class Main {
     // CSV Import / Export (same as before)
     // =======================
     //Todo fix with changes in task
+    //todo define class format in csv
+    //split array with /
     public static void importCSV(String filePath) {
         try {
             BufferedReader br = new BufferedReader(new FileReader("C:\\Users\\kevin\\IdeaProjects\\SOEN-342\\ProofOfConcept\\ImportTasks\\" + filePath));
@@ -117,8 +120,9 @@ public class Main {
             System.out.println("Error reading file");
         }
     }
-
+    //todo format lists
     //Todo fix with project
+    //split array with /
     public static void exportCSV(String filePath) {
         try {
             BufferedWriter bw = new BufferedWriter(new FileWriter(filePath));
@@ -167,12 +171,27 @@ public class Main {
             System.out.println(t);
         }
     }
-    //todo Ocl constrant
-    //todo recurrence guards
+
+    //constantly checks the due date constraint
+    public static boolean checkTasks() {
+        int missingDate=0;
+        for (Task t : tasks) {
+            if (t.dueDate==null) {
+                missingDate++;
+            }
+        }
+        for (Subtask s : subtasks) {
+            if (s.dueDate==null) {
+                missingDate++;
+            }
+        }
+        return missingDate < 50;
+    }
     //todo project implement
     //handles both normal creation and subtask
     public static void createTask() {
         Scanner sc = new Scanner(System.in);
+        String[] recurrHandler=new String[2];
         boolean flag = true;
         String option;
         String taskName;
@@ -212,6 +231,11 @@ public class Main {
                 if (option.equals("Y")) {
                     System.out.println("What will be the due date of the task?(YYYY-MM-DD)");
                     dueDate = LocalDate.parse(sc.nextLine());
+                }else{
+                    if(!checkTasks()){
+                        System.out.println("Too many tasks missing due date. Please put one.(YYYY-MM-DD)");
+                        dueDate = LocalDate.parse(sc.nextLine());
+                    }
                 }
                 System.out.println("What will be the project name of the task?");
                 projectName = sc.nextLine();
@@ -220,11 +244,9 @@ public class Main {
                 System.out.println("Is this task recurring?(Y/N)");
                 recurringChoice = sc.nextLine();
                 if (recurringChoice.equals("Y")) {
-                        System.out.println("What will be the recurring type of the task?");
-                        recurringType = sc.nextLine();
-                        System.out.println("What will be the recurring description of the task?");
-                        recurringDescription = sc.nextLine();
-                        recurring=true;
+                        recurrHandler= handleReccuringCreation();
+                        recurringType=recurrHandler[0];
+                        recurringDescription=recurrHandler[1];
                 }
                 while(flag){
                     System.out.println("Add a tag?(Y/N)");
@@ -243,6 +265,7 @@ public class Main {
                 }
                 history.add(new History(LocalDate.now(), "task created"));
                 tasks.add(new Task(taskName,description,status,priority,dueDate,projectName,projectDescription,recurring,recurringType,recurringDescription,tags,subtasks,history));
+                sc.close();
                 break;
                 case 2:
                     System.out.println("What is the name of the task that you wish to add a sub task to?");
@@ -251,15 +274,20 @@ public class Main {
                     if (index == -1) {
                         System.out.println("task not found");
                     }else{
-                        if (tasks.get(index).getSubtasks().size()<20) {
+                        if(!checkTasks()){
+                            System.out.println("This will create too many tasks without due dates. Please update a task.");
+                            sc.close();
+                        } else if (tasks.get(index).getSubtasks().size()<20) {
                             System.out.println("What is the name of the sub task?");
                             taskName = sc.nextLine();
                             tasks.get(index).createSubtask(taskName);
                             subtasks.add(tasks.get(index).getSubtasks().getLast());
                             tasks.get(index).history.add(new History(LocalDate.now(), "subtask added"));
                             subtasks.getLast().history.add(new History(LocalDate.now(), "task created"));
+                            sc.close();
                         }else{
                             System.out.println("There are 20 sub tasks in this task");
+                            sc.close();
                         }
                     }
 
@@ -268,6 +296,7 @@ public class Main {
 
     //updates one attribute at a time
     public static void updateTask(Task task, String Attribute,String value){
+
         switch (Attribute){
             case "title":
                 task.setTaskName(value);
@@ -290,9 +319,22 @@ public class Main {
                     break;
 
                     case "dueDate":
-                        task.setDueDate(LocalDate.parse(value));
-                        task.history.add(new History(LocalDate.now(), "task due date updated"));
-                        break;
+                        if(checkTasks()){
+                            task.setDueDate(LocalDate.parse(value));
+                            task.history.add(new History(LocalDate.now(), "task due date updated"));
+                            break;
+
+                        }else{
+                            if(value.isEmpty()){
+                                Scanner sc = new Scanner(System.in);
+                                LocalDate force;
+                                System.out.println("Please enter a valid date, the 50 due date limit is reached");
+                                String newValue = sc.nextLine();
+                                task.setDueDate(LocalDate.parse(newValue));
+                                task.history.add(new History(LocalDate.now(), "task due date updated"));
+                                sc.close();
+                            }
+                        }
 
                         case "projectName":
                             task.setProjectName(value);
@@ -319,9 +361,11 @@ public class Main {
         int index = tasks.indexOf(taskName);
         if (index == -1) {
             System.out.println("task not found");
+            sc.close();
         }
         else{
             System.out.print(tasks.get(index).getHistory());
+            sc.close();
         }
     }
 
@@ -341,7 +385,7 @@ public class Main {
                         break;
                     case "weekly":
                         int dayOfWeek= t.dueDate.getDayOfWeek().getValue();
-                        String[] parts = t.recurringDescription.split(" ");
+                        String[] parts = t.recurringDescription.split("/");
                         boolean[] boolArray = new boolean[parts.length];
                         for (int i = 0; i < parts.length; i++) {
                             boolArray[i] = Boolean.parseBoolean(parts[i]);
@@ -376,7 +420,7 @@ public class Main {
                         }
                         break;
                     case "numberOfDays":
-                        String[] part = t.recurringDescription.split(" ");
+                        String[] part = t.recurringDescription.split("/");
                         LocalDate[] startAndEnd = new LocalDate[part.length];
                         for (int i = 0; i < part.length; i++) {
                             startAndEnd[i] = LocalDate.parse(part[i]);
@@ -396,7 +440,46 @@ public class Main {
             }
         }
     }
+    //split array with /
+    public static String[] handleReccuringCreation(){
+        Scanner sc = new Scanner(System.in);
+        String[] output = new String[3];
+        System.out.print("Enter recurrence type:(daily,weekly,monthly,numberOfDays)");
+        String choice=sc.nextLine();
+        switch(choice) {
+            case "daily":
+                output[0] = "daily";
+                output[1] = "";
+                sc.close();
+                return output;
+            case "weekly":
+                output[0] = "weekly";
+                System.out.println("Enter the days of the week: (monday=1,sunday=7, separated by /)");
+                output[1] = sc.nextLine();
+                sc.close();
+                return output;
+            case "monthly":
+                output[0] = "monthly";
+                output[1] = "";
+                sc.close();
+                return output;
+            case "numberOfDays":
+                System.out.println("Enter start date:");
+                output[0] = sc.nextLine();
+                System.out.println("Enter end date:");
+                output[1] = sc.nextLine();
+                output[1]=output[0]+" "+output[1];
+                output[0]="numberOfDays";
+                sc.close();
+                return output;
 
+
+                default:
+                    sc.close();
+                    return output;
+        }
+    }
+    // changes tags one at a time
     public static void manageTags(Task task){
         Scanner sc = new Scanner(System.in);
         System.out.println("Select an option");
@@ -409,10 +492,12 @@ public class Main {
                 String tagName = sc.next();
                 if (task.tags.contains(tagName)){
                     System.out.println("tag already exists. try again");
+                    sc.close();
                     break;
                 }
                 task.tags.add(tagName);
                 task.history.add(new History(LocalDate.now(), "updated tags"));
+                sc.close();
                 break;
                 case 2:
                     System.out.println("enter tag name:");
@@ -420,9 +505,11 @@ public class Main {
                     if (task.tags.contains(tagNam)){
                         task.tags.remove(tagNam);
                         task.history.add(new History(LocalDate.now(), "deleted tag"));
+                        sc.close();
                         break;
                     }
                     System.out.println("tag not found. try again");
+                    sc.close();
                     break;
         }
     }
