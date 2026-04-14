@@ -6,7 +6,7 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 
 public class Main {
-
+    static List<Project> projects = new ArrayList<>();
     // Database of tasks (in memory)
     static List<Task> tasks = new ArrayList<>();
     // Single shared scanner — never close it mid-program; closing System.in is permanent
@@ -24,7 +24,11 @@ public class Main {
             System.out.println("5. Create task");
             System.out.println("6. Update task");
             System.out.println("7. View Task History");
-            System.out.println("8. Exit");
+            System.out.println("8. Create Project");
+            System.out.println("9. View Projects");
+            System.out.println("10. Add Task to Project");
+            System.out.println("11. Export to iCal");
+            System.out.println("12. Exit");
 
             System.out.print("Choose option: ");
             int choice = scanner.nextInt();
@@ -77,6 +81,32 @@ public class Main {
                     break;
 
                 case 8:
+
+                    System.out.print("Project name: ");
+                    String pname = scanner.nextLine();
+
+                    System.out.print("Description (optional): ");
+                    String pdesc = scanner.nextLine();
+
+                    projects.add(new Project(pname, pdesc));
+                    System.out.println("Project created.");
+                    break;
+
+                case 9:
+                    viewProjects();
+                    break;
+
+                case 10:
+                    assignTaskToProject();
+                    break;
+
+                case 11:
+                    System.out.print("Enter .ics file name: ");
+                    String icalFile = scanner.nextLine();
+                    exportToICal(icalFile);
+                    break;
+
+                case 12:
                     saveTasks();
                     System.out.println("Goodbye.");
                     scanner.close();
@@ -255,11 +285,25 @@ public class Main {
                     dueDate = LocalDate.parse(scanner.nextLine());
                 }
 
-                System.out.println("Project name:");
-                String projectName = scanner.nextLine();
 
-                System.out.println("Project description:");
-                String projectDescription = scanner.nextLine();
+                System.out.println("Assign to existing project? (Y/N)");
+                String projectName = "";
+                String projectDescription = "";
+
+                if (scanner.nextLine().equalsIgnoreCase("Y")) {
+                    System.out.print("Enter project name: ");
+                    String pname = scanner.nextLine();
+
+                    Optional<Project> proj = findProject(pname);
+                    if (proj.isPresent()) {
+                        projectName = pname;
+                        projectDescription = proj.get().description;
+                    } else {
+                        System.out.println("Project not found. Task will not be assigned.");
+                    }
+                }
+
+
 
                 boolean recurring = false;
                 String recurringType = "";
@@ -567,6 +611,115 @@ public class Main {
             System.out.println("Error loading tasks: " + e.getMessage());
         }
     }
+
+    public static Optional<Project> findProject(String name) {
+        for (Project p : projects) {
+            if (p.name.equals(name)) {
+                return Optional.of(p);
+            }
+        }
+        return Optional.empty();
+    }
+
+    public static void viewProjects() {
+        if (projects.isEmpty()) {
+            System.out.println("No projects available.");
+            return;
+        }
+
+        for (Project p : projects) {
+            System.out.println("\n" + p);
+
+            if (p.tasks.isEmpty()) {
+                System.out.println("  No tasks in this project.");
+            } else {
+                System.out.println("  Tasks:");
+                for (Task t : p.tasks) {
+                    System.out.println("   - " + t.taskName + " (Status: " + t.status + ")");
+                }
+            }
+        }
+    }
+
+    public static void assignTaskToProject() {
+        System.out.print("Enter task name: ");
+        String taskName = scanner.nextLine();
+
+        Optional<Task> taskOpt = findTask(taskName);
+        if (!taskOpt.isPresent()) {
+            System.out.println("Task not found.");
+            return;
+        }
+
+        System.out.print("Enter project name: ");
+        String projectName = scanner.nextLine();
+
+        Optional<Project> projOpt = findProject(projectName);
+        if (!projOpt.isPresent()) {
+            System.out.println("Project not found.");
+            return;
+        }
+
+        Task task = taskOpt.get();
+        Project project = projOpt.get();
+
+        project.addTask(task);
+
+        // Also update task fields (important for consistency)
+        task.setProjectName(project.name);
+        task.setProjectDescription(project.description);
+
+        System.out.println("Task added to project.");
+    }
+
+    public static void exportToICal(String fileName) {
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter(fileName+".ics"))) {
+
+            // Calendar header
+            bw.write("BEGIN:VCALENDAR\n");
+            bw.write("VERSION:2.0\n");
+            bw.write("PRODID:-//TaskManager//EN\n");
+
+            for (Task t : tasks) {
+
+                if (t.dueDate == null) continue; // skip tasks without dates
+
+                String date = t.dueDate.toString().replace("-", "");
+
+                bw.write("BEGIN:VEVENT\n");
+
+                // Unique ID
+                bw.write("UID:" + UUID.randomUUID() + "\n");
+
+                // Timestamp (now)
+                bw.write("DTSTAMP:" + LocalDate.now().toString().replace("-", "") + "T000000Z\n");
+
+                // Event date (all-day event)
+                bw.write("DTSTART;VALUE=DATE:" + date + "\n");
+                bw.write("DTEND;VALUE=DATE:" + date + "\n");
+
+                // Title
+                bw.write("SUMMARY:" + t.taskName + "\n");
+
+                // Description
+                bw.write("DESCRIPTION:" + t.description + "\n");
+
+                // Optional: project info
+                if (t.projectName != null && !t.projectName.isEmpty()) {
+                    bw.write("CATEGORIES:" + t.projectName + "\n");
+                }
+
+                bw.write("END:VEVENT\n");
+            }
+
+            bw.write("END:VCALENDAR\n");
+
+            System.out.println("iCal file exported successfully.");
+
+        } catch (IOException e) {
+            System.out.println("Error writing iCal file: " + e.getMessage());
+        }
+    }
 }
 
 // =======================
@@ -744,7 +897,9 @@ class Project implements Serializable {
     }
 
     public void addTask(Task task) {
-        tasks.add(task);
+        if (!tasks.contains(task)) {
+            tasks.add(task);
+        }
     }
 
     public void removeTask(String taskName) {
@@ -757,4 +912,7 @@ class Project implements Serializable {
                 " | Desc: " + description +
                 " | Tasks: " + tasks.size();
     }
+
 }
+
+
