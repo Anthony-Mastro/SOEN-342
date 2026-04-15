@@ -12,6 +12,8 @@ public class Main {
     // Single shared scanner — never close it mid-program; closing System.in is permanent
     static Scanner scanner = new Scanner(System.in);
 
+    static List<Collaborator> collaborators = new ArrayList<>();
+
     public static void main(String[] args) {
         loadTasks();
         checkRecurringTasks();
@@ -21,14 +23,20 @@ public class Main {
             System.out.println("2. Search Tasks");
             System.out.println("3. View All Tasks");
             System.out.println("4. Export Tasks to CSV");
-            System.out.println("5. Create task");
+            System.out.println("5. Create task / subtask");
             System.out.println("6. Update task");
-            System.out.println("7. View Task History");
-            System.out.println("8. Create Project");
-            System.out.println("9. View Projects");
-            System.out.println("10. Add Task to Project");
-            System.out.println("11. Export to iCal");
-            System.out.println("12. Exit");
+            System.out.println("7. View Subtasks of a Task");
+            System.out.println("8. Update Subtask Status");
+            System.out.println("9. View Task History");
+            System.out.println("10. Create Project");
+            System.out.println("11. View Projects");
+            System.out.println("12. Add Task to Project");
+            System.out.println("13. Export to iCal");
+            System.out.println("14. Create Collaborator");
+            System.out.println("15. View Collaborators");
+            System.out.println("16. Assign Task to Collaborator");
+            System.out.println("17. View Overloaded Collaborators");
+            System.out.println("18. Exit");
 
             System.out.print("Choose option: ");
             int choice = scanner.nextInt();
@@ -77,10 +85,17 @@ public class Main {
                     break;
 
                 case 7:
+                    viewSubtasks();
+                    break;
+                case 8:
+                    updateSubtaskStatus();
+                    break;
+
+                case 9:
                     viewHistory();
                     break;
 
-                case 8:
+                case 10:
 
                     System.out.print("Project name: ");
                     String pname = scanner.nextLine();
@@ -92,21 +107,57 @@ public class Main {
                     System.out.println("Project created.");
                     break;
 
-                case 9:
+                case 11:
                     viewProjects();
                     break;
 
-                case 10:
+                case 12:
                     assignTaskToProject();
                     break;
 
-                case 11:
+                case 13:
                     System.out.print("Enter .ics file name: ");
                     String icalFile = scanner.nextLine();
                     exportToICal(icalFile);
                     break;
 
-                case 12:
+                case 14: // Create a Collaborator
+                    createCollaborator();
+                    break;
+
+                case 15: // View Collaborators
+                    viewCollaborators();
+                    break;
+
+                case 16: // Assign Task to Collaborator
+                    System.out.print("Enter parent task name: ");
+                    String tName = scanner.nextLine();
+                    Optional<Task> tOpt = tasks.stream().filter(t -> t.taskName.equalsIgnoreCase(tName)).findFirst();
+
+                    System.out.print("Enter collaborator name: ");
+                    String cName = scanner.nextLine();
+                    Collaborator collab = null;
+                    for (Collaborator c : collaborators) {
+                        if (c.name.equalsIgnoreCase(cName)) {
+                            collab = c;
+                            break;
+                        }
+                    }
+
+                    if (tOpt.isPresent() && collab != null) {
+                        System.out.print("Enter a title for this new subtask: ");
+                        String subTitle = scanner.nextLine();
+                        assignCollaborator(tOpt.get(), collab, subTitle);
+                    } else {
+                        System.out.println("Task or Collaborator not found.");
+                    }
+                    break;
+
+                case 17: // View Overloaded Collaborators
+                    viewOverloadedCollaborators();
+                    break;
+
+                case 18:
                     saveTasks();
                     System.out.println("Goodbye.");
                     scanner.close();
@@ -606,6 +657,7 @@ public class Main {
             // Save both lists to the same file
             out.writeObject(tasks);
             out.writeObject(projects);
+            out.writeObject(collaborators);
             System.out.println("Data saved successfully.");
         } catch (IOException e) {
             System.out.println("Error saving data: " + e.getMessage());
@@ -624,6 +676,7 @@ public class Main {
             // Read them back in the SAME order: Tasks then Projects
             tasks = (List<Task>) in.readObject();
             projects = (List<Project>) in.readObject();
+            collaborators = (List<Collaborator>) in.readObject();
             System.out.println("Data loaded successfully.");
         } catch (IOException | ClassNotFoundException e) {
             System.out.println("Error loading data: " + e.getMessage());
@@ -691,7 +744,7 @@ public class Main {
     }
 
     public static void exportToICal(String fileName) {
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter(fileName+".ics"))) {
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter("ProofOfConcept/ICAL/" + fileName+".ics"))) {
 
             // Calendar header
             bw.write("BEGIN:VCALENDAR\n");
@@ -736,6 +789,178 @@ public class Main {
 
         } catch (IOException e) {
             System.out.println("Error writing iCal file: " + e.getMessage());
+        }
+    }
+
+
+    public static void assignCollaborator(Task parentTask, Collaborator collab, String subtaskTitle) {
+        // Check Iteration III Overload Constraint
+        long openTasks = tasks.stream()
+                .flatMap(t -> t.subtasks.stream())
+                .filter(s -> s.collaborator != null && s.collaborator.name.equals(collab.name) && s.status.equalsIgnoreCase("open"))
+                .count();
+
+        if (openTasks >= collab.getTaskLimit()) {
+            System.out.println("Error: Collaborator " + collab.name + " is at their limit of " + collab.getTaskLimit());
+            return;
+        }
+
+        // Create the subtask and link it
+        Subtask newSub = new Subtask(subtaskTitle, parentTask.description, "open",
+                parentTask.priority, parentTask.dueDate,
+                parentTask.projectName, parentTask.projectDescription,
+                false, "", "", new ArrayList<>(),
+                new ArrayList<>(), new ArrayList<>(), collab);
+
+        parentTask.subtasks.add(newSub);
+        System.out.println("Assigned " +  subtaskTitle + " to " + collab.name );
+    }
+
+
+    public static void viewOverloadedCollaborators() {
+        System.out.println("\n--- Overloaded Collaborators ---");
+        boolean anyoneOverloaded = false;
+
+        for (Collaborator c : collaborators) {
+            // Count all subtasks assigned to this person that are still "open"
+            long count = tasks.stream()
+                    .flatMap(t -> t.subtasks.stream())
+                    .filter(s -> s.collaborator != null &&
+                            s.collaborator.name.equals(c.name) &&
+                            s.status.equalsIgnoreCase("open"))
+                    .count();
+
+            if (count > c.getTaskLimit()) {
+                System.out.println("ALERT: " + c.name + " (" + c.category + ") is overloaded!");
+                System.out.println("  Current Open Tasks: " + count);
+                System.out.println("  Allowed Limit: " + c.getTaskLimit());
+                System.out.println("---------------------------------");
+                anyoneOverloaded = true;
+            }
+        }
+
+        if (!anyoneOverloaded) {
+            System.out.println("No collaborators are currently overloaded.");
+        }
+    }
+
+    public static void createCollaborator() {
+        System.out.print("Enter collaborator name: ");
+        String name = scanner.nextLine();
+
+        System.out.println("Select Category:");
+        System.out.println("1. Senior (Limit: 2)");
+        System.out.println("2. Intermediate (Limit: 5)");
+        System.out.println("3. Junior (Limit: 10)");
+        System.out.print("Choice: ");
+
+        int catChoice = scanner.nextInt();
+        scanner.nextLine(); // consume newline
+
+        String category = "";
+        switch (catChoice) {
+            case 1: category = "Senior"; break;
+            case 2: category = "Intermediate"; break;
+            case 3: category = "Junior"; break;
+            default:
+                System.out.println("Invalid choice. Defaulting to Junior.");
+                category = "Junior";
+        }
+
+        collaborators.add(new Collaborator(name, category));
+        System.out.println("Collaborator " + name + " created successfully.");
+    }
+
+    public static void viewCollaborators() {
+        if (collaborators.isEmpty()) {
+            System.out.println("No collaborators have been created yet.");
+            return;
+        }
+
+        System.out.println("\n--- Registered Collaborators ---");
+        for (Collaborator c : collaborators) {
+            // Count open tasks for this specific collaborator
+            long openCount = tasks.stream()
+                    .flatMap(t -> t.subtasks.stream())
+                    .filter(s -> s.collaborator != null &&
+                            s.collaborator.name.equalsIgnoreCase(c.name) &&
+                            s.status.equalsIgnoreCase("open"))
+                    .count();
+
+            System.out.println("Name: " + c.name);
+            System.out.println("  Category: " + c.category);
+            System.out.println("  Workload: " + openCount + "/" + c.getTaskLimit() + " open tasks");
+            System.out.println("---------------------------------");
+        }
+    }
+
+    public static void viewSubtasks() {
+        System.out.print("Enter parent task name to view its subtasks: ");
+        String parentName = scanner.nextLine();
+
+        Optional<Task> parentOpt = tasks.stream()
+                .filter(t -> t.taskName.equalsIgnoreCase(parentName))
+                .findFirst();
+
+        if (parentOpt.isPresent()) {
+            Task parent = parentOpt.get();
+            if (parent.subtasks.isEmpty()) {
+                System.out.println("This task has no subtasks.");
+            } else {
+                System.out.println("\n--- Subtasks for: " + parent.taskName + " ---");
+                for (int i = 0; i < parent.subtasks.size(); i++) {
+                    Subtask s = parent.subtasks.get(i);
+                    String collabName = (s.collaborator != null) ? s.collaborator.name : "Unassigned";
+                    System.out.println(i + ". [" + s.status.toUpperCase() + "] " + s.taskName +
+                            " (Assigned to: " + collabName + ")");
+                }
+            }
+        } else {
+            System.out.println("Parent task not found.");
+        }
+    }
+
+    public static void updateSubtaskStatus() {
+        System.out.print("Enter parent task name: ");
+        String parentName = scanner.nextLine();
+
+        Optional<Task> parentOpt = tasks.stream()
+                .filter(t -> t.taskName.equalsIgnoreCase(parentName))
+                .findFirst();
+
+        if (parentOpt.isPresent()) {
+            Task parent = parentOpt.get();
+            if (parent.subtasks.isEmpty()) {
+                System.out.println("No subtasks found for this task.");
+                return;
+            }
+
+            // Show subtasks so user can pick one
+            for (int i = 0; i < parent.subtasks.size(); i++) {
+                System.out.println(i + ". " + parent.subtasks.get(i).taskName + " [Current: " + parent.subtasks.get(i).status + "]");
+            }
+
+            System.out.print("Enter index of subtask to update: ");
+            int index = scanner.nextInt();
+            scanner.nextLine(); // consume newline
+
+            if (index >= 0 && index < parent.subtasks.size()) {
+                Subtask sub = parent.subtasks.get(index);
+                System.out.print("Enter new status (open/closed): ");
+                String newStatus = scanner.nextLine();
+
+                sub.status = newStatus;
+                sub.history.add(new History(LocalDate.now(), "Subtask status updated to " + newStatus));
+
+                System.out.println("Subtask '" + sub.taskName + "' updated to " + newStatus + ".");
+                if (newStatus.equalsIgnoreCase("closed")) {
+                    System.out.println("Workload updated for collaborator: " + (sub.collaborator != null ? sub.collaborator.name : "N/A"));
+                }
+            } else {
+                System.out.println("Invalid index.");
+            }
+        } else {
+            System.out.println("Parent task not found.");
         }
     }
 }
@@ -898,6 +1123,23 @@ class Collaborator implements Serializable { // FIX: must be Serializable
     public String toString() {
         return "Collaborator{}";
     }
+
+    String name;
+    String category; // Senior, Intermediate, or Junior
+
+    public Collaborator(String name, String category) {
+        this.name = name;
+        this.category = category;
+    }
+
+    public int getTaskLimit() {
+        if (category.equalsIgnoreCase("Senior")) return 2;
+        if (category.equalsIgnoreCase("Intermediate")) return 5;
+        if (category.equalsIgnoreCase("Junior")) return 10;
+        return 0;
+    }
+
+
 }
 
 
