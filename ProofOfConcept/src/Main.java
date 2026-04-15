@@ -168,7 +168,7 @@ public class Main {
 
     // Tags and subtask names are joined with "/" so they don't break the comma split on re-import
     public static void exportCSV(String filePath) {
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter(filePath))) {
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter("ProofOfConcept/ExportTasks/" + filePath))) {
             for (Task t : tasks) {
                 // Build tag string (/-separated)
                 StringBuilder tagStr = new StringBuilder();
@@ -286,7 +286,7 @@ public class Main {
                 }
 
 
-                System.out.println("Assign to existing project? (Y/N)");
+
                 String projectName = "";
                 String projectDescription = "";
 
@@ -602,25 +602,31 @@ public class Main {
     // Persistence
     // =======================
     public static void saveTasks() {
-        // Save main task list
         try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream("tasks.dat"))) {
+            // Save both lists to the same file
             out.writeObject(tasks);
-            System.out.println("Tasks saved.");
+            out.writeObject(projects);
+            System.out.println("Data saved successfully.");
         } catch (IOException e) {
-            System.out.println("Error saving tasks: " + e.getMessage());
+            System.out.println("Error saving data: " + e.getMessage());
         }
     }
 
     @SuppressWarnings("unchecked")
     public static void loadTasks() {
-        try (ObjectInputStream in = new ObjectInputStream(new FileInputStream("tasks.dat"))) {
+        File file = new File("tasks.dat");
+        if (!file.exists()) {
+            System.out.println("No saved data found. Starting fresh.");
+            return;
+        }
+
+        try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(file))) {
+            // Read them back in the SAME order: Tasks then Projects
             tasks = (List<Task>) in.readObject();
-            System.out.println("Tasks loaded.");
-        } catch (FileNotFoundException e) {
-            System.out.println("No saved tasks found. Starting fresh.");
-           // System.out.println(System.getProperty("user.dir"));
+            projects = (List<Project>) in.readObject();
+            System.out.println("Data loaded successfully.");
         } catch (IOException | ClassNotFoundException e) {
-            System.out.println("Error loading tasks: " + e.getMessage());
+            System.out.println("Error loading data: " + e.getMessage());
         }
     }
 
