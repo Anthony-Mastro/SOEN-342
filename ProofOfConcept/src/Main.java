@@ -5,8 +5,6 @@ import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 
-import static java.util.Objects.isNull;
-
 public class Main {
     static List<Project> projects = new ArrayList<>();
     // Database of tasks (in memory)
@@ -1147,15 +1145,15 @@ public class Main {
         }
 
         for (Task t : mix) {
-            if (isNull(t.dueDate)) check1++;
+            if (t.dueDate==null) check1++;
             for (Subtask s : t.subtasks) {
-                if (isNull(s.dueDate)) check1++;
+                if (s.dueDate==null) check1++;
             }
         }
         for (Task t : full) {
-            if (isNull(t.dueDate)) check2++;
+            if (t.dueDate==null) check2++;
             for (Subtask s : t.subtasks) {
-                if (isNull(s.dueDate)) check2++;
+                if (s.dueDate==null) check2++;
             }
         }
 
