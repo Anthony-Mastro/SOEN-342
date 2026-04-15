@@ -990,11 +990,11 @@ public class Main {
                 new ArrayList<>(),new ArrayList<>(),new ArrayList<>()));
         tests.add(new Task("weekopen","","open",
                 "",date,"","",true,
-                "weekly","1/5",new ArrayList<>(),
+                "weekly","true/false/false/false/true/false/false",new ArrayList<>(),
                 new ArrayList<>(),new ArrayList<>()));
         tests.add(new Task("weekclose","","complete",
                 "",date,"","",true,
-                "weekly","3",new ArrayList<>(),
+                "weekly","false/false/true/false/false/false/false",new ArrayList<>(),
                 new ArrayList<>(),new ArrayList<>()));
         tests.add(new Task("monthopen","","open",
                 "",date,"","",true,
@@ -1012,7 +1012,9 @@ public class Main {
                 "",date,"","",true,
                 "numberOfDays","2020-01-29/2020-02-21",
                 new ArrayList<>(),new ArrayList<>(),new ArrayList<>()));
-
+        for (Task t : tests){
+            t.history.add(new History(date, "Task created"));
+        }
         LocalDate today = LocalDate.now();
         List<Task> output = new ArrayList<>(); // avoid modifying list while iterating
 
@@ -1074,7 +1076,6 @@ public class Main {
                     break;
                 }
             }
-
             if (next != null) {
                 next.history.add(new History(LocalDate.now(), "task created by recurrence"));
                 output.add(next);
@@ -1085,7 +1086,9 @@ public class Main {
             }
         }
         tests.addAll(output);
-        System.out.println(tests);
+        for (Task t : tests) {
+            System.out.println(t);
+        }
         for (Task t : tests) {
             System.out.println(t.getHistory());
         }
