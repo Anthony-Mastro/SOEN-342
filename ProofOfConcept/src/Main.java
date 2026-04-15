@@ -290,16 +290,28 @@ public class Main {
                 String projectName = "";
                 String projectDescription = "";
 
-                if (scanner.nextLine().equalsIgnoreCase("Y")) {
-                    System.out.print("Enter project name: ");
+                while (true) {
+                    System.out.print("Assign to existing project? (Y/N): ");
+                    if (!scanner.nextLine().equalsIgnoreCase("Y")) {
+                        break;
+                    }
+
+                    System.out.print("Enter project name (or type 'cancel' to stop): ");
                     String pname = scanner.nextLine();
 
+                    if (pname.equalsIgnoreCase("cancel")) {
+                        break;
+                    }
+
                     Optional<Project> proj = findProject(pname);
+
                     if (proj.isPresent()) {
                         projectName = pname;
                         projectDescription = proj.get().description;
+                        System.out.println("Project assigned successfully.");
+                        break;
                     } else {
-                        System.out.println("Project not found. Task will not be assigned.");
+                        System.out.println("Project not found. Try again.");
                     }
                 }
 
