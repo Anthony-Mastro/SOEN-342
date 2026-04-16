@@ -163,6 +163,10 @@ public class Main {
                     scanner.close();
                     return;
 
+                case 19:
+                    runTests();
+                    break;
+
                 default:
                     System.out.println("Invalid option. Please choose 1-8.");
             }
@@ -963,6 +967,216 @@ public class Main {
             System.out.println("Parent task not found.");
         }
     }
+    //============================
+    // Unit tests
+    //============================
+    //To show features and constraints that would be difficult to demo.
+
+    //============================
+    // Test to show that recurring logic will work
+    //============================
+    public static void testRecurring(){
+        System.out.println("running test of recurring tasks logic:");
+
+        List<Task> tests = new ArrayList<>();
+        LocalDate date = LocalDate.of(2020,1,30);
+        tests.add(new Task("dayopen","","open",
+                "",date,"","",
+                true,"daily","",
+                new ArrayList<>(),new ArrayList<>(),new ArrayList<>()));
+        tests.add(new Task("daycomplete","","complete",
+                "",date,"","",true,
+                "daily","",
+                new ArrayList<>(),new ArrayList<>(),new ArrayList<>()));
+        tests.add(new Task("weekopen","","open",
+                "",date,"","",true,
+                "weekly","true/false/false/false/true/false/false",new ArrayList<>(),
+                new ArrayList<>(),new ArrayList<>()));
+        tests.add(new Task("weekclose","","complete",
+                "",date,"","",true,
+                "weekly","false/false/true/false/false/false/false",new ArrayList<>(),
+                new ArrayList<>(),new ArrayList<>()));
+        tests.add(new Task("monthopen","","open",
+                "",date,"","",true,
+                "monthly","",new ArrayList<>(),
+                new ArrayList<>(),new ArrayList<>()));
+        tests.add(new Task("monthclose","","complete",
+                "",date,"","",true,
+                "monthly","",new ArrayList<>(),
+                new ArrayList<>(),new ArrayList<>()));
+        tests.add(new Task("daysopen","","open",
+                "",date,"","",true,
+                "numberOfDays","2020-01-29/2020-02-20",
+                new ArrayList<>(),new ArrayList<>(),new ArrayList<>()));
+        tests.add(new Task("daysclose","","complete",
+                "",date,"","",true,
+                "numberOfDays","2020-01-29/2020-02-21",
+                new ArrayList<>(),new ArrayList<>(),new ArrayList<>()));
+        for (Task t : tests){
+            t.history.add(new History(date, "Task created"));
+        }
+        LocalDate today = LocalDate.now();
+        List<Task> output = new ArrayList<>(); // avoid modifying list while iterating
+
+        for (Task t : tests) {
+            if (!t.isRecurring || t.dueDate == null || !t.dueDate.isBefore(today)) continue;
+
+            Task next = null;
+            switch (t.recurringType) {
+                case "daily":
+                    next = new Task(t.taskName, t.description, "open", t.priority,
+                            t.dueDate.plusDays(1), t.projectName, t.projectDescription,
+                            true, t.recurringType, t.recurringDescription,
+                            new ArrayList<>(t.tags), new ArrayList<>(), new ArrayList<>());
+                    break;
+
+                case "weekly": {
+                    String[] parts = t.recurringDescription.split("/");
+                    boolean[] days = new boolean[7];
+                    for (int i = 0; i < parts.length && i < 7; i++) {
+                        days[i] = Boolean.parseBoolean(parts[i]);
+                    }
+                    int dow = t.dueDate.getDayOfWeek().getValue() % 7; // 0=Sun..6=Sat using ISO mod
+                    // advance to next enabled day
+                    for (int i = 1; i <= 7; i++) {
+                        int candidate = (dow + i) % 7;
+                        if (days[candidate]) {
+                            LocalDate nextDate = t.dueDate.with(
+                                    TemporalAdjusters.next(DayOfWeek.of(candidate == 0 ? 7 : candidate)));
+                            next = new Task(t.taskName, t.description, "open", t.priority,
+                                    nextDate, t.projectName, t.projectDescription,
+                                    true, t.recurringType, t.recurringDescription,
+                                    new ArrayList<>(t.tags), new ArrayList<>(), new ArrayList<>());
+                            break;
+                        }
+                    }
+                    break;
+                }
+
+                case "monthly":
+                    next = new Task(t.taskName, t.description, "open", t.priority,
+                            t.dueDate.plusMonths(1), t.projectName, t.projectDescription,
+                            true, t.recurringType, t.recurringDescription,
+                            new ArrayList<>(t.tags), new ArrayList<>(), new ArrayList<>());
+                    break;
+
+                case "numberOfDays": {
+                    // FIX: description stored as "startDate/endDate" (slash-separated)
+                    String[] part = t.recurringDescription.split("/");
+                    if (part.length < 2) break;
+                    LocalDate start = LocalDate.parse(part[0]);
+                    LocalDate end = LocalDate.parse(part[1]);
+                    long span = ChronoUnit.DAYS.between(start, end);
+                    LocalDate newStart = start.plusDays(span);
+                    LocalDate newEnd = end.plusDays(span);
+                    next = new Task(t.taskName, t.description, "open", t.priority,
+                            newEnd, t.projectName, t.projectDescription,
+                            true, t.recurringType, newStart + "/" + newEnd,
+                            new ArrayList<>(t.tags), new ArrayList<>(), new ArrayList<>());
+                    break;
+                }
+            }
+            if (next != null) {
+                next.history.add(new History(LocalDate.now(), "task created by recurrence"));
+                output.add(next);
+                if (t.status.equals("open")) {
+                    t.setStatus("canceled");
+                    t.history.add(new History(LocalDate.now(), "task canceled by recurrence"));
+                }
+            }
+        }
+        tests.addAll(output);
+        for (Task t : tests) {
+            System.out.println(t);
+        }
+        for (Task t : tests) {
+            System.out.println(t.getHistory());
+        }
+        System.out.println("test passed");
+
+
+    }
+
+    //=============================
+    // Test showing that the guard for 20 subtasks will trigger
+    //=============================
+    public static void test20subtasks(){
+        System.out.println("running 20 subtasks constraint test");
+
+        Task test = new Task("subs", "d","s",
+                "p",LocalDate.parse("0001-01-01"),
+                "","",false,
+                "","", new ArrayList<>(),
+                new ArrayList<>(), new ArrayList<>());
+        while(test.getSubtasks().size()<20){
+            test.createSubtask("fodder");
+        }
+        System.out.println("test passed");
+    }
+    //=============================
+    // Test showing that the guard for 50 missing due dates will trigger
+    //=============================
+    public static void test50duedate() {
+        System.out.println("Running 50 due date constraint test:");
+        List<Task> mix = new ArrayList<>();
+        List<Task> full = new ArrayList<>();
+        int check1 = 0;
+        int check2 = 0;
+        while (mix.size() < 30) {
+            mix.add(new Task("subs", "d", "s",
+                    "p", null, "", "",
+                    false, "", "",
+                    new ArrayList<>(), new ArrayList<>(), new ArrayList<>()));
+        }
+        mix.get(1).createSubtask("fodder");
+        mix.get(0).createSubtask("fodder");
+        mix.get(5).createSubtask("fodder");
+        mix.get(12).createSubtask("fodder");
+        mix.get(7).createSubtask("fodder");
+        while(mix.get(27).subtasks.size() < 10){
+            mix.get(27).createSubtask("fodder");
+        }
+        while(mix.get(22).subtasks.size() < 5){
+            mix.get(22).createSubtask("fodder");
+        }
+
+        while (full.size() < 50) {
+            full.add(new Task("subs", "d", "s",
+                    "p", null, "", "",
+                    false, "", "",
+                    new ArrayList<>(), new ArrayList<>(), new ArrayList<>()));
+        }
+
+        for (Task t : mix) {
+            if (t.dueDate==null) check1++;
+            for (Subtask s : t.subtasks) {
+                if (s.dueDate==null) check1++;
+            }
+        }
+        for (Task t : full) {
+            if (t.dueDate==null) check2++;
+            for (Subtask s : t.subtasks) {
+                if (s.dueDate==null) check2++;
+            }
+        }
+
+        if (check1 == 50) {
+            System.out.println("Mixed tasks test passed");
+        }
+        if (check2 == 50) {
+            System.out.println("Tasks only test passed");
+        }
+    }
+
+    //====================
+    // Consolidates all unit test into one command
+    //====================
+    public static void runTests(){
+        testRecurring();
+        test20subtasks();
+        test50duedate();
+    }
+
 }
 
 // =======================
